@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import GroupOrbitDetail from "./GroupOrbitDetail";
 
 const API = "http://localhost:8080/api";
 
@@ -266,6 +267,7 @@ const styles = `
     position: relative;
     z-index: 1;
     animation: fadeIn 0.4s ease;
+    height: 100%;
   }
 
   .detail-header {
@@ -402,10 +404,27 @@ const styles = `
   }
 
   .member-token {
-    font-size: 12px;
-    color: rgba(255,255,255,0.4);
-    font-family: monospace;
+    font-size: 13px;
+    color: rgba(232,224,213,0.75);
+    font-family: 'Crimson Pro', Georgia, serif;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: color 0.2s;
+    user-select: none;
+  }
+
+  .member-token:hover {
+    color: #c8a97e;
+  }
+
+  .member-reroll-hint {
+    font-size: 9px;
+    color: rgba(139,0,0,0.45);
     letter-spacing: 1px;
+    font-family: 'Cinzel', serif;
+    margin-top: 1px;
+    cursor: pointer;
+    user-select: none;
   }
 
   .member-role {
@@ -582,6 +601,28 @@ const styles = `
   }
 `;
 
+// ─── Anonymous gothic name generator ─────────────────────────────────────────
+const ADJ = [
+  "Silent","Hollow","Ashen","Crimson","Veiled","Sunken","Pale","Bitter",
+  "Fractured","Obsidian","Forsaken","Cursed","Murky","Spectral","Waning",
+  "Dire","Sullen","Fading","Ruined","Twisted","Sombre","Gaunt","Shrouded",
+  "Blighted","Dread","Fevered","Muted","Harrowed","Stark","Scorned",
+];
+const NOUN = [
+  "Fox","Raven","Wraith","Moth","Crow","Veil","Thorn","Shade","Echo",
+  "Wisp","Omen","Pyre","Void","Mist","Bone","Specter","Knell","Ember",
+  "Gale","Rust","Dusk","Lore","Tide","Ash","Gloom","Sigil","Husk","Dirge",
+];
+
+function getAnonName(id, seed = 0) {
+  let h = 5381;
+  const key = String(id);
+  for (let i = 0; i < key.length; i++) h = ((h << 5) + h) ^ key.charCodeAt(i);
+  const base = Math.abs(h);
+  return ADJ[(base + seed) % ADJ.length] + " " + NOUN[(base + seed * 7 + 3) % NOUN.length];
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Dashboard({ user, onLogout, onEnterChat }) {
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -595,8 +636,17 @@ export default function Dashboard({ user, onLogout, onEnterChat }) {
   const [msg, setMsg] = useState(null);
   const [copied, setCopied] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  // Tracks how many times each member's alias has been rerolled: { [memberId]: seed }
+  const [nameSeeds, setNameSeeds] = useState({});
 
   useEffect(() => { fetchGroups(); fetchUnread(); }, []);
+
+  // Reset name seeds whenever we switch to a different group
+  useEffect(() => { setNameSeeds({}); }, [selectedGroup?.id]);
+
+  const rerollName = (memberId) => {
+    setNameSeeds(prev => ({ ...prev, [memberId]: ((prev[memberId] || 0) + 1) }));
+  };
 
   const fetchGroups = async () => {
     setLoading(true);
@@ -740,7 +790,7 @@ export default function Dashboard({ user, onLogout, onEnterChat }) {
           </aside>
 
           {/* Main Content */}
-          <main className="db-main">
+          <main className="db-main" style={selectedGroup ? { padding: 0 } : {}}>
             <div className="bg-grid-main" />
 
             {!selectedGroup ? (
@@ -754,57 +804,15 @@ export default function Dashboard({ user, onLogout, onEnterChat }) {
                 <div className="empty-sub">Choose a circle or create a new one to begin whispering</div>
               </div>
             ) : (
-              <div className="group-detail">
-                <div className="detail-header">
-                  <div>
-                    <div className="detail-name">{selectedGroup.groupName}</div>
-                    <div className="detail-invite">
-                      <span className="invite-label">Invite code</span>
-                      <span className="invite-code" onClick={copyInviteCode}>
-                        {selectedGroup.inviteCode}
-                      </span>
-                      {copied && <span className="copied-tip">Copied!</span>}
-                    </div>
-                  </div>
-                  <div className="detail-actions">
-                    <button
-                      className="btn-action btn-chat"
-                      onClick={() => onEnterChat && onEnterChat(selectedGroup)}
-                    >
-                      Enter Chat
-                    </button>
-                    <button className="btn-action btn-leave" onClick={handleLeave}>
-                      Leave
-                    </button>
-                  </div>
-                </div>
-
-                <div className="members-title">
-                  Members — {members.length}
-                </div>
-
-                {membersLoading ? (
-                  <div className="loading-row">
-                    <div className="spinner" /> Loading members...
-                  </div>
-                ) : (
-                  <div className="members-grid">
-                    {members.map((m, i) => (
-                      <div key={i} className="member-card">
-                        <div className="member-avatar">
-                          {m.role === "ADMIN" ? "A" : "M"}
-                        </div>
-                        <div>
-                          <div className="member-token">
-                            {m.userId ? `user_${m.userId}` : "anonymous"}
-                          </div>
-                          <div className="member-role">{m.role}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <GroupOrbitDetail
+                group={{
+                  ...selectedGroup,
+                  name: selectedGroup.groupName,
+                  members: membersLoading ? [] : members,
+                }}
+                onEnterChat={() => onEnterChat && onEnterChat(selectedGroup)}
+                onBack={() => setSelectedGroup(null)}
+              />
             )}
           </main>
         </div>
