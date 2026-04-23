@@ -324,10 +324,25 @@ export default function AuthPage({ onLogin }) {
   const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    if (token) verifyEmail(token);
-  }, []);
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      const verified = params.get("verified");
+
+      if (token) verifyEmail(token);
+
+      if (verified === "true") {
+        setVerified(true);
+        setMessage({
+          type: "success",
+          text: "Email verified! You can now log in."
+        });
+      } else if (verified === "false") {
+        setMessage({
+          type: "error",
+          text: "Verification failed or link expired. Please register again."
+        });
+      }
+    }, []);
 
   const verifyEmail = async (token) => {
     try {
